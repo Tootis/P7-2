@@ -22,11 +22,9 @@ exports.createThing = (req, res, next) => {
   
     thing.save()
       .then(() => {
-        console.log(`Objet enregistré avec URL d'image : ${thing.imageUrl}`);
         res.status(201).json({ message: "Objet enregistré !" });
       })
       .catch(error => {
-        console.error('Erreur lors de l\'enregistrement de l\'objet :', error);
         res.status(400).json({ error });
       });
   };
@@ -48,12 +46,9 @@ exports.modifyThing = (req, res, next) => {
         if (req.file) {
         
           const oldImagePath = path.join(__dirname, '..', 'images',thing.imageUrl.split('/').pop());
-          
-
-          console.log('Chemin de l\'ancienne image :', oldImagePath);
+        
           fs.unlink(oldImagePath, (err) => {
             if (err) {
-              console.error('Erreur lors de la suppression de l\'ancienne image:', err);
               return res.status(500).json({ error: 'Erreur lors de la suppression de l\'ancienne image.' });
             }
   
