@@ -1,43 +1,76 @@
 const Thing = require('../models/Thing')
 const fs = require('fs');
+const path = require('path');
 
 
 exports.createThing = (req, res, next) => {
-  const thingObject = JSON.parse(req.body.book);
-  console.log(thingObject)
-  delete thingObject._id;
-  delete thingObject._userId;
-  const thing = new Thing({
+    const thingObject = JSON.parse(req.body.book);
+    console.log(thingObject);
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Aucun fichier image fourni.' });
+    }
+  
+    delete thingObject._id;
+    delete thingObject._userId;
+  
+    const thing = new Thing({
       ...thingObject,
       userId: req.auth.userId,
       imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
-  });
-  thing.save()
-  .then(() => { res.status(201).json({message: 'Objet enregistré !'})})
-  .catch(error => {res.status(400).json( { error })})
-};
+    });
+  
+    thing.save()
+      .then(() => {
+        console.log(`Objet enregistré avec URL d'image : ${thing.imageUrl}`);
+        res.status(201).json({ message: "Objet enregistré !" });
+      })
+      .catch(error => {
+        console.error('Erreur lors de l\'enregistrement de l\'objet :', error);
+        res.status(400).json({ error });
+      });
+  };
 
 exports.modifyThing = (req, res, next) => {
-  const thingObject = req.file ? {
-      ...JSON.parse(req.body.thing),
+    const thingObject = req.file ? {
+      ...JSON.parse(req.body.book),
       imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
-  } : { ...req.body };
-
-  delete thingObject._userId;
-  Thing.findOne({_id: req.params.id})
+    } : { ...req.body };
+  
+    delete thingObject._userId;
+  
+    Thing.findOne({ _id: req.params.id })
       .then((thing) => {
-          if (thing.userId != req.auth.userId) {
-              res.status(401).json({ message : 'Not authorized'});
-          } else {
-              Thing.updateOne({ _id: req.params.id}, { ...thingObject, _id: req.params.id})
-              .then(() => res.status(200).json({message : 'Objet modifié!'}))
-              .catch(error => res.status(401).json({ error }));
-          }
+        if (thing.userId != req.auth.userId) {
+          return res.status(401).json({ message: 'Not authorized' });
+        }
+  
+        if (req.file) {
+        
+          const oldImagePath = path.join(__dirname, '..', 'images',thing.imageUrl.split('/').pop());
+          
+
+          console.log('Chemin de l\'ancienne image :', oldImagePath);
+          fs.unlink(oldImagePath, (err) => {
+            if (err) {
+              console.error('Erreur lors de la suppression de l\'ancienne image:', err);
+              return res.status(500).json({ error: 'Erreur lors de la suppression de l\'ancienne image.' });
+            }
+  
+            Thing.updateOne({ _id: req.params.id }, { ...thingObject, _id: req.params.id })
+              .then(() => res.status(200).json({ message: 'Objet modifié!' }))
+              .catch(error => res.status(400).json({ error }));
+          });
+        } else {
+          Thing.updateOne({ _id: req.params.id }, { ...thingObject, _id: req.params.id })
+            .then(() => res.status(200).json({ message: 'Objet modifié!' }))
+            .catch(error => res.status(400).json({ error }));
+        }
       })
       .catch((error) => {
-          res.status(400).json({ error });
+        res.status(400).json({ error });
       });
-};
+  };
 
 exports.deleteThing = (req, res, next) => {
   Thing.findOne({ _id: req.params.id})
